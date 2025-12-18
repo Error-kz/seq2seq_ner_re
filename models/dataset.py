@@ -60,7 +60,7 @@ class Seq2SeqDataset(Dataset):
         input_encoding = self.tokenizer(
             input_text,
             max_length=self.max_length,
-            padding='max_length',
+            padding=False,
             truncation=True,
             return_tensors=None  # 返回列表而不是tensor
         )
@@ -69,7 +69,7 @@ class Seq2SeqDataset(Dataset):
         target_encoding = self.tokenizer(
             output_text,
             max_length=self.max_target_length,
-            padding='max_length',
+            padding=False,
             truncation=True,
             return_tensors=None  # 返回列表而不是tensor
         )
@@ -84,6 +84,9 @@ class Seq2SeqDataset(Dataset):
             # 如果全部是padding，至少保留第一个token
             labels[0] = target_encoding['input_ids'][0]
         
+        if np.sum(labels != 100) < 3:
+            print('⚠️有效的标签数量太少，可能会导致训练不稳定')
+            
         return {
             'input_ids': np.array(input_encoding['input_ids'], dtype=np.int64),
             'attention_mask': np.array(input_encoding['attention_mask'], dtype=np.int64),
@@ -115,7 +118,7 @@ class Seq2SeqInferenceDataset(Dataset):
         encoding = self.tokenizer(
             text,
             max_length=self.max_length,
-            padding='max_length',
+            padding=False,
             truncation=True,
             return_tensors=None  # 返回列表而不是tensor
         )

@@ -203,7 +203,7 @@ def train_model():
     gradient_accumulation_steps = getattr(config, 'GRADIENT_ACCUMULATION_STEPS', 1)
     steps_per_epoch = (len(train_dataset) + config.BATCH_SIZE * gradient_accumulation_steps - 1) // (config.BATCH_SIZE * gradient_accumulation_steps)
     total_steps = steps_per_epoch * config.NUM_EPOCHS
-    warmup_steps = min(config.WARMUP_STEPS, max(1, total_steps // 10))  # warmup不超过总步数的10%，至少为1
+    warmup_steps = max(10,min(config.WARMUP_STEPS, total_steps // 10))  # warmup不超过总步数的10%，至少为1
     
     training_args = TrainingArguments(
         output_dir=config.MODEL_DIR,
