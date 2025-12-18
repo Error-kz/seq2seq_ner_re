@@ -4,6 +4,12 @@
 import os
 import sys
 
+# 添加项目根目录到路径，以便导入 config
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 # 必须在导入 torch 之前设置 CUDA_VISIBLE_DEVICES
 from config import Config
 config_temp = Config()
@@ -48,11 +54,7 @@ from transformers import (
 )
 from torch.utils.data import DataLoader
 
-# 添加父目录到路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from models.dataset import Seq2SeqDataset
-from config import Config
 
 # 导入LoRA相关库
 try:
