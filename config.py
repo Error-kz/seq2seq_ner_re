@@ -17,7 +17,7 @@ class Config:
     
     # 训练数据路径
     TRAIN_DATA_PATH = os.path.join(DATA_DIR, 'train_seq2seq.txt')
-    DEV_DATA_PATH = os.path.join(DATA_DIR, 'dev_seq2seq.txt')
+    DEV_DATA_PATH = os.path.join(DATA_DIR, 'test_seq2seq.txt')
     
     # 模型配置
     # 推荐模型（按优先级）:
