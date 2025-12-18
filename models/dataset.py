@@ -1,130 +1,159 @@
 """
-Seq2Seq数据集类
+最终稳定版 Seq2Seq Dataset（NER + RE 专用）
+
+设计目标：
+- 绝不出现空 label
+- 不在 Dataset 阶段 padding target
+- token 数稳定，FP16 + LoRA 不炸
+- 适配 Trainer + DataCollatorForSeq2Seq
 """
+
 import os
 import sys
-import torch
 import numpy as np
 from torch.utils.data import Dataset
-from transformers import T5Tokenizer
-
-# 添加父目录到路径
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
 
 
 class Seq2SeqDataset(Dataset):
-    """Seq2Seq训练数据集"""
-    
+    """稳定版 Seq2Seq 训练数据集"""
+
     def __init__(self, data_path, tokenizer, max_length=512, max_target_length=256):
         """
         Args:
-            data_path: 训练数据文件路径
-            tokenizer: T5 tokenizer
-            max_length: 最大输入长度
-            max_target_length: 最大输出长度
+            data_path: 数据文件路径，每行格式：input <SEP> output
+            tokenizer: HuggingFace tokenizer (T5Tokenizer)
+            max_length: 输入最大长度
+            max_target_length: target 最大长度（仅用于 truncation，不 padding）
         """
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.max_target_length = max_target_length
-        
-        # 读取数据
-        print(f"正在读取数据文件: {data_path}")
+
+        print(f"📥 正在读取数据文件: {data_path}")
         with open(data_path, 'r', encoding='utf-8') as f:
             self.samples = [line.strip() for line in f if line.strip()]
-        
-        print(f"共加载 {len(self.samples)} 条样本")
-    
+
+        print(f"✅ 共加载 {len(self.samples)} 条样本")
+
     def __len__(self):
         return len(self.samples)
-    
+
+    # ============================
+    # 核心：稳定 target 构造逻辑
+    # ============================
+    def _normalize_output(self, output_text: str) -> str:
+        """
+        保证 target：
+        1. 永远非空
+        2. 结构稳定（匹配实际数据格式：三元组列表）
+        3. token 数不少于安全线
+        """
+        output_text = output_text.strip()
+
+        # 情况 1：完全空或只有空白
+        if output_text == "" or not output_text:
+            # 返回一个有效的空三元组格式（保持格式一致性）
+            output_text = "(NONE, NONE, NONE)"
+
+        # 情况 2：只有 NONE（大小写不敏感）
+        elif output_text.upper().strip() == "NONE":
+            output_text = "(NONE, NONE, NONE)"
+
+        # 情况 3：已有三元组格式（默认信任上游）
+        # 实际格式示例: (实体1, 关系, 实体2); (实体3, 关系, 实体4)
+        # 这里可以添加更严格的格式校验，但为了稳定性，先信任上游数据
+
+        # ============================
+        # token 数安全保护（非常重要）
+        # 确保有足够的 token 避免 FP16 精度问题
+        # ============================
+        token_len = len(self.tokenizer.tokenize(output_text))
+        if token_len < 5:
+            # 工程兜底：如果 token 数太少，补充一些 padding
+            # 注意：这里不添加 <PAD> token，因为会被 mask 掉
+            # 而是添加一些不影响语义的占位符
+            output_text = output_text + " . . ."
+        
+        return output_text
+
     def __getitem__(self, idx):
         line = self.samples[idx]
-        
-        # 分割输入和输出
+
+        # ----------------------------
+        # 1. 拆分 input / output
+        # ----------------------------
         if ' <SEP> ' in line:
             input_text, output_text = line.split(' <SEP> ', 1)
         else:
-            # 如果没有分隔符，尝试其他方式
-            parts = line.split(' <SEP> ')
-            if len(parts) >= 2:
-                input_text = parts[0]
-                output_text = ' <SEP> '.join(parts[1:])
-            else:
-                input_text = line
-                output_text = ""
-        
-        # Tokenize输入（返回列表而不是tensor，避免DataCollator警告）
-        input_encoding = self.tokenizer(
+            input_text = line
+            output_text = ""
+
+        # ----------------------------
+        # 2. 标准化 target（关键）
+        # ----------------------------
+        output_text = self._normalize_output(output_text)
+
+        # ----------------------------
+        # 3. Tokenize input（padding 到 max_length）
+        # ----------------------------
+        input_enc = self.tokenizer(
             input_text,
             max_length=self.max_length,
-            padding=False,
             truncation=True,
-            return_tensors=None  # 返回列表而不是tensor
+            padding='max_length',
+            return_tensors=None,
         )
-        
-        # Tokenize输出（作为labels）
-        target_encoding = self.tokenizer(
+
+        # ----------------------------
+        # 4. Tokenize target（不 padding）
+        # ----------------------------
+        target_enc = self.tokenizer(
             output_text,
             max_length=self.max_target_length,
-            padding=False,
             truncation=True,
-            return_tensors=None  # 返回列表而不是tensor
+            padding=False,  # 关键：不在 Dataset 阶段 padding
+            return_tensors=None,
         )
-        
-        # 将padding token的label设为-100（忽略计算loss）
-        labels = np.array(target_encoding['input_ids'], dtype=np.int64)
-        pad_token_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
+
+        labels = np.array(target_enc['input_ids'], dtype=np.int64)
+
+        # 将 pad token mask 为 -100（忽略 loss）
+        pad_token_id = (
+            self.tokenizer.pad_token_id
+            if self.tokenizer.pad_token_id is not None
+            else self.tokenizer.eos_token_id
+        )
         labels[labels == pad_token_id] = -100
-        
-        # 确保labels不是全部为-100（至少有一些有效标签）
-        if np.all(labels == -100):
-            # 如果全部是padding，至少保留第一个token
-            labels[0] = target_encoding['input_ids'][0]
-        
-        if np.sum(labels != 100) < 3:
-            print('⚠️有效的标签数量太少，可能会导致训练不稳定')
-            
+
         return {
-            'input_ids': np.array(input_encoding['input_ids'], dtype=np.int64),
-            'attention_mask': np.array(input_encoding['attention_mask'], dtype=np.int64),
-            'labels': labels
+            'input_ids': np.array(input_enc['input_ids'], dtype=np.int64),
+            'attention_mask': np.array(input_enc['attention_mask'], dtype=np.int64),
+            'labels': labels,
         }
 
 
+# ============================
+# 推理数据集（可选）
+# ============================
 class Seq2SeqInferenceDataset(Dataset):
-    """Seq2Seq推理数据集"""
-    
     def __init__(self, texts, tokenizer, max_length=512):
-        """
-        Args:
-            texts: 输入文本列表
-            tokenizer: T5 tokenizer
-            max_length: 最大输入长度
-        """
+        self.texts = texts
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.texts = texts
-    
+
     def __len__(self):
         return len(self.texts)
-    
+
     def __getitem__(self, idx):
         text = self.texts[idx]
-        
-        # Tokenize输入
-        encoding = self.tokenizer(
+        enc = self.tokenizer(
             text,
             max_length=self.max_length,
-            padding=False,
             truncation=True,
-            return_tensors=None  # 返回列表而不是tensor
+            padding='max_length',
+            return_tensors=None,
         )
-        
         return {
-            'input_ids': np.array(encoding['input_ids'], dtype=np.int64),
-            'attention_mask': np.array(encoding['attention_mask'], dtype=np.int64),
+            'input_ids': np.array(enc['input_ids'], dtype=np.int64),
+            'attention_mask': np.array(enc['attention_mask'], dtype=np.int64),
         }
-
