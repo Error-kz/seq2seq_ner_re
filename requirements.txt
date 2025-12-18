@@ -1,17 +1,17 @@
 # Seq2Seq NER+RE 项目依赖
 # PyTorch相关（使用稳定版本，避免版本冲突）
-torch>=2.0.0,<2.6.0
+torch==2.2.2
 torchvision>=0.15.0
 torchaudio>=2.0.0
 
 # Transformers（使用兼容PyTorch 2.2的版本）
-transformers>=4.30.0,<4.57.0
+transformers==4.56.2
 
 # LoRA微调库
 peft>=0.6.0
 
 # 其他依赖
-numpy>=1.21.0,<2.0.0  # NumPy 2.x与PyTorch 2.2.2不兼容
+numpy==1.26.4  # NumPy 2.x与PyTorch 2.2.2不兼容
 tqdm>=4.60.0
-sentencepiece>=0.1.99  # T5Tokenizer需要
+sentencepiece==0.2.1  # T5Tokenizer需要
 
