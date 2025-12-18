@@ -144,7 +144,7 @@ def train_model():
         model.print_trainable_parameters()
         
         # 移动模型到设备（强制使用CUDA或CPU，不使用MPS）
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = config.DEVICE
         print(f"   使用设备: {device.upper()}")
         model = model.to(device)
     else:
@@ -158,7 +158,7 @@ def train_model():
         print(f"   可训练参数: {trainable_params_before/1e6:.1f}M")
         
         # 移动模型到设备（强制使用CUDA或CPU，不使用MPS）
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = config.DEVICE
         print(f"   使用设备: {device.upper()}")
         model = model.to(device)
     
@@ -197,7 +197,7 @@ def train_model():
         learning_rate = config.LEARNING_RATE * 5
         print(f"   LoRA微调模式，学习率调整为: {learning_rate}")
     # 检查是否使用CUDA GPU
-    use_cuda = torch.cuda.is_available()
+    use_cuda = torch.cuda.is_available() and "cuda" in config.DEVICE
     
     # 计算总训练步数，确保warmup_steps不会太大
     gradient_accumulation_steps = getattr(config, 'GRADIENT_ACCUMULATION_STEPS', 1)
@@ -233,6 +233,7 @@ def train_model():
     
     if use_cuda:
         print(f"   ✅ 检测到CUDA设备，使用GPU加速:")
+        print(f"      CUDA设备: {config.DEVICE}")
         print(f"      Batch size: {config.BATCH_SIZE}")
         print(f"      梯度累积步数: {getattr(config, 'GRADIENT_ACCUMULATION_STEPS', 1)}")
         print(f"      等效batch size: {config.BATCH_SIZE * getattr(config, 'GRADIENT_ACCUMULATION_STEPS', 1)}")

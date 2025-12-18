@@ -49,8 +49,9 @@ class Config:
     EARLY_STOPPING = True  # 早停
     DO_SAMPLE = False  # 是否采样
     
-    # 设备
-    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    # 设备配置
+    CUDA_DEVICE_ID = 7  # 指定使用的CUDA设备ID
+    DEVICE = f"cuda:{CUDA_DEVICE_ID}" if torch.cuda.is_available() else "cpu"
     
     # 关系类型定义
     RELATION_TYPES = [

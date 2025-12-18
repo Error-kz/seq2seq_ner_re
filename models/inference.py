@@ -40,7 +40,8 @@ class Seq2SeqNER_RE:
         self.model.eval()
         
         # 移动到设备
-        self.device = torch.device(Config.DEVICE if torch.cuda.is_available() else "cpu")
+        config = Config()
+        self.device = torch.device(config.DEVICE)
         self.model.to(self.device)
         
         self.config = config

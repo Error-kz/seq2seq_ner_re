@@ -23,7 +23,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              device_ids: ['7']  # 指定使用GPU 7
               capabilities: [gpu]
     # 或者使用 runtime: nvidia（旧版本）
     # runtime: nvidia
