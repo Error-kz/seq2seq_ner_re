@@ -199,6 +199,12 @@ def train_model():
     # 检查是否使用CUDA GPU
     use_cuda = torch.cuda.is_available()
     
+    # 计算总训练步数，确保warmup_steps不会太大
+    gradient_accumulation_steps = getattr(config, 'GRADIENT_ACCUMULATION_STEPS', 1)
+    steps_per_epoch = (len(train_dataset) + config.BATCH_SIZE * gradient_accumulation_steps - 1) // (config.BATCH_SIZE * gradient_accumulation_steps)
+    total_steps = steps_per_epoch * config.NUM_EPOCHS
+    warmup_steps = min(config.WARMUP_STEPS, max(1, total_steps // 10))  # warmup不超过总步数的10%，至少为1
+    
     training_args = TrainingArguments(
         output_dir=config.MODEL_DIR,
         num_train_epochs=config.NUM_EPOCHS,
@@ -206,7 +212,8 @@ def train_model():
         per_device_eval_batch_size=config.BATCH_SIZE,
         gradient_accumulation_steps=getattr(config, 'GRADIENT_ACCUMULATION_STEPS', 1),  # 梯度累积
         learning_rate=learning_rate,
-        warmup_steps=config.WARMUP_STEPS,
+        warmup_steps=warmup_steps,
+        lr_scheduler_type="linear",  # 明确指定学习率调度器类型
         logging_dir=config.LOG_DIR,
         logging_steps=config.LOGGING_STEPS,
         save_steps=config.SAVE_STEPS,
@@ -220,6 +227,8 @@ def train_model():
         bf16=False,  # 可选：如果GPU支持bf16，可以启用
         dataloader_num_workers=4 if use_cuda else 0,  # CUDA可以使用多进程加载数据
         dataloader_pin_memory=True if use_cuda else False,  # CUDA支持pin_memory加速
+        max_grad_norm=1.0,  # 梯度裁剪，防止梯度爆炸和nan
+        report_to="none",  # 禁用wandb等外部日志
     )
     
     if use_cuda:
@@ -230,6 +239,9 @@ def train_model():
         print(f"      最大输入长度: {config.MAX_LENGTH}")
         print(f"      最大输出长度: {config.MAX_TARGET_LENGTH}")
         print(f"      FP16混合精度: 启用")
+        print(f"      总训练步数: {total_steps}")
+        print(f"      Warmup步数: {warmup_steps}")
+        print(f"      梯度裁剪: 1.0")
     
     # 6. 创建Trainer
     print("\n5. 创建Trainer...")

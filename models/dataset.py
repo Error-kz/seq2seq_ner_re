@@ -4,6 +4,7 @@ Seq2Seq数据集类
 import os
 import sys
 import torch
+import numpy as np
 from torch.utils.data import Dataset
 from transformers import T5Tokenizer
 
@@ -55,13 +56,13 @@ class Seq2SeqDataset(Dataset):
                 input_text = line
                 output_text = ""
         
-        # Tokenize输入
+        # Tokenize输入（返回列表而不是tensor，避免DataCollator警告）
         input_encoding = self.tokenizer(
             input_text,
             max_length=self.max_length,
             padding='max_length',
             truncation=True,
-            return_tensors='pt'
+            return_tensors=None  # 返回列表而不是tensor
         )
         
         # Tokenize输出（作为labels）
@@ -70,16 +71,22 @@ class Seq2SeqDataset(Dataset):
             max_length=self.max_target_length,
             padding='max_length',
             truncation=True,
-            return_tensors='pt'
+            return_tensors=None  # 返回列表而不是tensor
         )
         
         # 将padding token的label设为-100（忽略计算loss）
-        labels = target_encoding['input_ids'].squeeze().clone()
-        labels[labels == self.tokenizer.pad_token_id] = -100
+        labels = np.array(target_encoding['input_ids'], dtype=np.int64)
+        pad_token_id = self.tokenizer.pad_token_id if self.tokenizer.pad_token_id is not None else self.tokenizer.eos_token_id
+        labels[labels == pad_token_id] = -100
+        
+        # 确保labels不是全部为-100（至少有一些有效标签）
+        if np.all(labels == -100):
+            # 如果全部是padding，至少保留第一个token
+            labels[0] = target_encoding['input_ids'][0]
         
         return {
-            'input_ids': input_encoding['input_ids'].squeeze(),
-            'attention_mask': input_encoding['attention_mask'].squeeze(),
+            'input_ids': np.array(input_encoding['input_ids'], dtype=np.int64),
+            'attention_mask': np.array(input_encoding['attention_mask'], dtype=np.int64),
             'labels': labels
         }
 
@@ -110,11 +117,11 @@ class Seq2SeqInferenceDataset(Dataset):
             max_length=self.max_length,
             padding='max_length',
             truncation=True,
-            return_tensors='pt'
+            return_tensors=None  # 返回列表而不是tensor
         )
         
         return {
-            'input_ids': encoding['input_ids'].squeeze(),
-            'attention_mask': encoding['attention_mask'].squeeze(),
+            'input_ids': np.array(encoding['input_ids'], dtype=np.int64),
+            'attention_mask': np.array(encoding['attention_mask'], dtype=np.int64),
         }
 
