@@ -18,38 +18,72 @@
 
 ```
 seq2seq_ner_re/
-├── config.py              # 配置文件
-├── requirements.txt        # 依赖列表
+├── config.py                 # 配置文件
+├── requirements.txt           # 依赖列表
+├── Dockerfile                 # CPU 版本 Dockerfile
+├── Dockerfile.gpu             # GPU 版本 Dockerfile
+├── docker-compose.yml         # CPU 版本 docker-compose
+├── docker-compose.gpu.yml     # GPU 版本 docker-compose
+├── docker-run.sh              # Docker 运行脚本
 ├── scripts/
-│   ├── train.py          # 训练脚本
-│   └── generate_data.py   # 数据生成脚本
+│   ├── train.py              # 训练脚本
+│   └── generate_data.py      # 数据生成脚本
 ├── models/
-│   ├── dataset.py        # 数据集类
-│   └── inference.py      # 推理类
+│   ├── dataset.py           # 数据集类
+│   └── inference.py          # 推理类
 ├── data/
-│   ├── train_seq2seq.txt # 训练数据
-│   └── test_seq2seq.txt  # 测试数据
-└── clueAI/               # PromptCLUE 模型文件
+│   ├── train_seq2seq.txt     # 训练数据
+│   └── test_seq2seq.txt      # 测试数据
+└── clueAI/                   # PromptCLUE 模型文件
 ```
 
 ## 环境配置
 
-### 1. 创建虚拟环境
+### 方式1: 使用 Docker（推荐）
+
+#### CPU 版本
+
+```bash
+# 构建镜像
+docker-compose build
+
+# 运行训练
+docker-compose up
+```
+
+#### GPU 版本（需要 NVIDIA GPU 和 nvidia-docker）
+
+```bash
+# 构建 GPU 镜像
+docker-compose -f docker-compose.gpu.yml build
+
+# 运行训练（GPU）
+docker-compose -f docker-compose.gpu.yml up
+```
+
+#### 使用便捷脚本
+
+```bash
+# 自动检测 GPU 并使用相应版本
+./docker-run.sh
+```
+
+### 方式2: 本地环境
+
+#### 1. 创建虚拟环境
 
 ```bash
 conda create -n seq2seq_env python=3.11 -y
 conda activate seq2seq_env
 ```
 
-### 2. 安装依赖
+#### 2. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 使用方法
-
-### 训练模型
+#### 3. 训练模型
 
 ```bash
 python scripts/train.py
@@ -98,11 +132,47 @@ python scripts/train.py
 - 检查项目-疾病
 - 等13种关系类型
 
+## Docker 使用说明
+
+### 前置要求
+
+- **CPU 版本**: Docker 和 Docker Compose
+- **GPU 版本**: 
+  - NVIDIA GPU
+  - NVIDIA Docker Runtime（nvidia-docker2）
+  - Docker Compose
+
+### Docker 命令
+
+```bash
+# 查看日志
+docker-compose logs -f
+
+# 后台运行
+docker-compose up -d
+
+# 停止容器
+docker-compose down
+
+# 进入容器
+docker exec -it seq2seq_ner_re bash
+```
+
+### 数据挂载
+
+Docker 容器会自动挂载以下目录：
+- `./data` → `/app/data` (训练数据)
+- `./saved_model` → `/app/saved_model` (模型保存)
+- `./logs` → `/app/logs` (训练日志)
+- `./clueAI` → `/app/clueAI` (模型文件)
+
 ## 注意事项
 
 1. 模型文件（`pytorch_model.bin`）较大，已添加到 `.gitignore`
 2. 首次运行需要下载或准备 PromptCLUE 模型
 3. 确保有足够的显存（建议 8GB+）或使用 CPU 训练
+4. Docker 镜像构建可能需要一些时间（下载依赖）
+5. GPU 版本需要安装 nvidia-docker2
 
 ## License
 

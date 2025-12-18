@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  seq2seq-train:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: seq2seq_ner_re
+    volumes:
+      # 挂载数据目录
+      - ./data:/app/data
+      # 挂载模型保存目录
+      - ./saved_model:/app/saved_model
+      # 挂载日志目录
+      - ./logs:/app/logs
+      # 挂载模型文件（如果本地有）
+      - ./clueAI:/app/clueAI
+    environment:
+      - PYTHONUNBUFFERED=1
+    # 如果需要 GPU 支持，取消下面的注释
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # 或者使用 runtime: nvidia（旧版本）
+    # runtime: nvidia
+    restart: unless-stopped
+
