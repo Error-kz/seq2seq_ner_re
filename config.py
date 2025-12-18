@@ -50,8 +50,8 @@ class Config:
     DO_SAMPLE = False  # 是否采样
     
     # 设备配置
-    CUDA_DEVICE_ID = 7  # 指定使用的CUDA设备ID
-    DEVICE = f"cuda:{CUDA_DEVICE_ID}" if torch.cuda.is_available() else "cpu"
+    CUDA_VISIBLE_DEVICES = "4,5,6,7"  # 指定使用的 GPU 列表
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
     
     # 关系类型定义
     RELATION_TYPES = [

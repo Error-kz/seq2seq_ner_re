@@ -3,6 +3,13 @@
 """
 import os
 import sys
+
+# 必须在导入 torch 之前设置 CUDA_VISIBLE_DEVICES
+from config import Config
+config_temp = Config()
+if hasattr(config_temp, 'CUDA_VISIBLE_DEVICES'):
+    os.environ["CUDA_VISIBLE_DEVICES"] = config_temp.CUDA_VISIBLE_DEVICES
+
 import torch
 
 # 在导入transformers之前，禁用版本检查（临时解决方案）
